@@ -113,6 +113,12 @@ def reset_metrics():
     return {"status": "reset"}
 
 
+def is_vpp_document(filename: str) -> bool:
+    """VPP/pojistné podmínky — общие условия, не содержат данных контракта."""
+    name = filename.lower()
+    return "vpp" in name or "podmínky" in name or "podminky" in name
+
+
 def clean_ocr_text(text: str) -> str:
     """Предобработка OCR-текста для экономии токенов."""
     text = re.sub(r'[ \t]+', ' ', text)
@@ -151,9 +157,9 @@ POLE A PRAVIDLA:
 - endAt: string DD.MM.YYYY | null — konec pojištění. null = doba neurčitá
 - concludedAt: string DD.MM.YYYY — datum uzavření/podpisu smlouvy
 - installmentNumberPerInsurancePeriod: number — počet splátek: ročně=1, pololetně=2, čtvrtletně=4, měsíčně=12
-- insurancePeriodMonths: number — délka pojistného období: roční=12, pololetní=6, čtvrtletní=3, měsíční=1
+- insurancePeriodMonths: number | null — délka pojistného období: roční=12, pololetní=6, čtvrtletní=3, měsíční=1. null pokud není uvedeno
 - premium.currency: string — měna pojistného, ISO 4217 lowercase (czk, eur, usd)
-- premium.isCollection: boolean — true pokud je inkaso pojistného přes makléře/zprostředkovatele
+- premium.isCollection: boolean | null — true pokud je inkaso pojistného přes makléře/zprostředkovatele. null pokud nelze určit
 - actionOnInsurancePeriodTermination: "auto-renewal" | "policy-termination" — "auto-renewal" pokud se smlouva automaticky prodlužuje. "policy-termination" pokud po konci období končí
 - noticePeriod: string | null — výpovědní lhůta: "six-weeks", "three-months", "two-months", "one-month", "eight-days". null pokud není uvedena
 - regPlate: string | null — SPZ/RZ vozidla. null pokud nejde o vozidlo
@@ -235,7 +241,8 @@ def parse_gemini_response(response_text: str) -> dict:
             premium["currency"] = currency.lower()
         else:
             premium["currency"] = "czk"
-        if not isinstance(premium.get("isCollection"), bool):
+        is_coll = premium.get("isCollection")
+        if is_coll is not None and not isinstance(is_coll, bool):
             premium["isCollection"] = False
         data["premium"] = premium
     else:
@@ -251,7 +258,7 @@ def parse_gemini_response(response_text: str) -> dict:
     if inst not in (1, 2, 4, 12):
         data["installmentNumberPerInsurancePeriod"] = 1
     period = data.get("insurancePeriodMonths")
-    if period not in (1, 3, 6, 12):
+    if period is not None and period not in (1, 3, 6, 12):
         data["insurancePeriodMonths"] = 12
 
     return data
@@ -293,10 +300,12 @@ def set_cached_result(cache_key: str, value: dict):
 def solve(payload: dict):
     documents = payload.get("documents", [])
 
-    # Собираем и чистим OCR-текст
+    # Собираем и чистим OCR-текст (пропускаем VPP)
     combined_text = ""
     for doc in documents:
         filename = doc.get("filename", "unknown")
+        if is_vpp_document(filename):
+            continue
         ocr_text = clean_ocr_text(doc.get("ocr_text", ""))
         combined_text += f"\n=== {filename} ===\n{ocr_text}\n"
 
