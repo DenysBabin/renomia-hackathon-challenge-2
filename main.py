@@ -114,13 +114,13 @@ def reset_metrics():
 
 
 def is_vpp_document(filename: str) -> bool:
-    """VPP/pojistné podmínky — общие условия, не содержат данных контракта."""
+    """Check if document is VPP/general conditions (no contract-specific data)."""
     name = filename.lower()
     return "vpp" in name or "podmínky" in name or "podminky" in name
 
 
 def clean_ocr_text(text: str) -> str:
-    """Предобработка OCR-текста для экономии токенов."""
+    """Preprocess OCR text to save tokens."""
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'(?im)^[\s]*strana\s+\d+\s*(z\s+\d+)?[\s]*$', '', text)
@@ -130,7 +130,7 @@ def clean_ocr_text(text: str) -> str:
 
 
 def extract_endorsement_number(documents: list) -> str | None:
-    """Извлечь максимальный номер дополнения (dodatek) из файлов и текста."""
+    """Extract the highest endorsement (dodatek) number from filenames and text."""
     numbers = []
     for doc in documents:
         filename = doc.get("filename", "")
@@ -197,7 +197,7 @@ VALID_NOTICE_PERIODS = {
 
 
 def validate_date(value) -> str | None:
-    """Валидация и нормализация даты в формат DD.MM.YYYY."""
+    """Validate and normalize date to DD.MM.YYYY format."""
     if not value or not isinstance(value, str):
         return None
     m = re.match(r'^(\d{1,2})\.(\d{1,2})\.(\d{4})$', value.strip())
@@ -207,9 +207,9 @@ def validate_date(value) -> str | None:
 
 
 def parse_gemini_response(response_text: str) -> dict:
-    """Парсинг и валидация JSON-ответа от Gemini."""
+    """Parse and validate JSON response from Gemini."""
     text = response_text.strip()
-    # Убрать markdown-обёртку если есть
+    # Strip markdown wrapper if present
     md_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
     if md_match:
         text = md_match.group(1)
@@ -223,17 +223,17 @@ def parse_gemini_response(response_text: str) -> dict:
     except json.JSONDecodeError:
         return {}
 
-    # Валидация enum-полей
+    # Validate enum fields
     for field, valid_values in ENUM_DEFAULTS.items():
         val = data.get(field)
         if val not in valid_values:
             data[field] = ENUM_FALLBACKS[field]
 
-    # Валидация дат
+    # Validate dates
     for date_field in ("startAt", "endAt", "concludedAt"):
         data[date_field] = validate_date(data.get(date_field))
 
-    # currency → lowercase
+    # Currency to lowercase, isCollection can be bool or null
     premium = data.get("premium", {})
     if isinstance(premium, dict):
         currency = premium.get("currency", "czk")
@@ -248,12 +248,12 @@ def parse_gemini_response(response_text: str) -> dict:
     else:
         data["premium"] = {"currency": "czk", "isCollection": False}
 
-    # noticePeriod валидация
+    # Validate noticePeriod
     np = data.get("noticePeriod")
     if np and np not in VALID_NOTICE_PERIODS:
         data["noticePeriod"] = None
 
-    # installment и period — числа
+    # Validate installment and period numbers
     inst = data.get("installmentNumberPerInsurancePeriod")
     if inst not in (1, 2, 4, 12):
         data["installmentNumberPerInsurancePeriod"] = 1
@@ -265,7 +265,7 @@ def parse_gemini_response(response_text: str) -> dict:
 
 
 def get_cached_result(cache_key: str) -> dict | None:
-    """Получить результат из кэша PostgreSQL."""
+    """Get cached result from PostgreSQL."""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -281,7 +281,7 @@ def get_cached_result(cache_key: str) -> dict | None:
 
 
 def set_cached_result(cache_key: str, value: dict):
-    """Сохранить результат в кэш PostgreSQL."""
+    """Save result to PostgreSQL cache."""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -300,7 +300,7 @@ def set_cached_result(cache_key: str, value: dict):
 def solve(payload: dict):
     documents = payload.get("documents", [])
 
-    # Собираем и чистим OCR-текст (пропускаем VPP)
+    # Collect and clean OCR text (skip VPP documents)
     combined_text = ""
     for doc in documents:
         filename = doc.get("filename", "unknown")
@@ -309,21 +309,21 @@ def solve(payload: dict):
         ocr_text = clean_ocr_text(doc.get("ocr_text", ""))
         combined_text += f"\n=== {filename} ===\n{ocr_text}\n"
 
-    # Кэширование
+    # Cache lookup
     cache_key = hashlib.sha256(combined_text.encode()).hexdigest()
     cached = get_cached_result(cache_key)
     if cached:
         return cached
 
-    # Regex-извлечение endorsement number
+    # Extract endorsement number via regex
     endorsement_number = extract_endorsement_number(documents)
 
-    # Запрос к Gemini
+    # Call Gemini
     prompt = EXTRACTION_PROMPT + combined_text
     response = gemini.generate(prompt)
     extracted = parse_gemini_response(response.text)
 
-    # Собираем финальный результат
+    # Build final result
     result = {
         "contractNumber": extracted.get("contractNumber"),
         "insurerName": extracted.get("insurerName"),
@@ -344,7 +344,7 @@ def solve(payload: dict):
         "note": extracted.get("note"),
     }
 
-    # Кэшируем результат
+    # Cache result
     set_cached_result(cache_key, result)
 
     return result
