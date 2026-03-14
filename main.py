@@ -119,14 +119,17 @@ def solve(payload: dict):
     {
         "documents": [
             {
+                "pdf_url": "https://storage.googleapis.com/.../smlouva.pdf",
                 "filename": "smlouva_hlavni.pdf",
                 "ocr_text": "... OCR extracted text of main contract ..."
             },
             {
+                "pdf_url": "https://storage.googleapis.com/.../dodatek_1.pdf",
                 "filename": "dodatek_1.pdf",
                 "ocr_text": "... OCR text of amendment 1 ..."
             },
             {
+                "pdf_url": "https://storage.googleapis.com/.../dodatek_2.pdf",
                 "filename": "dodatek_2.pdf",
                 "ocr_text": "... OCR text of amendment 2 ..."
             }
