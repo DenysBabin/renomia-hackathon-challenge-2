@@ -5,7 +5,9 @@ Input:  OCR text from insurance contract documents (main contract + amendments)
 Output: Structured CRM fields extracted from the documents
 """
 
+import json
 import os
+import re
 import threading
 import time
 
@@ -25,7 +27,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 class GeminiTracker:
     """Wrapper around Gemini that tracks token usage."""
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
         self.enabled = bool(api_key)
         if self.enabled:
             genai.configure(api_key=api_key)
@@ -157,20 +159,39 @@ def solve(payload: dict):
         "note": null                       // special conditions summary or null
     }
     """
-    # TODO: Implement your solution here
-    #
-    # Suggested approach:
-    # 1. Concatenate OCR text from all documents (main contract + amendments)
-    # 2. Send to Gemini with a structured extraction prompt
-    # 3. Parse the response into the expected field format
-    # 4. For amendments: use the latest values (amendments override base contract)
-    # 5. For latestEndorsementNumber: find the highest amendment number
-
     documents = payload.get("documents", [])
 
+    # Собираем OCR-текст из всех документов
+    combined_text = ""
+    for doc in documents:
+        filename = doc.get("filename", "unknown")
+        ocr_text = doc.get("ocr_text", "")
+        combined_text += f"\n=== Dokument: {filename} ===\n{ocr_text}\n"
+
+    # Простой промпт для проверки связи с Gemini
+    prompt = f"""Из следующего OCR-текста страхового договора извлеки номер договора (contractNumber) и название страховой компании (insurerName).
+
+Ответь строго в формате JSON, например:
+{{"contractNumber": "ABC-123", "insurerName": "Allianz pojišťovna a.s."}}
+
+Текст документов:
+{combined_text}"""
+
+    response = gemini.generate(prompt)
+    response_text = response.text.strip()
+
+    # Пробуем распарсить JSON из ответа
+    json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+    extracted = {}
+    if json_match:
+        try:
+            extracted = json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+
     result = {
-        "contractNumber": None,
-        "insurerName": None,
+        "contractNumber": extracted.get("contractNumber"),
+        "insurerName": extracted.get("insurerName"),
         "state": "accepted",
         "assetType": "other",
         "concludedAs": "broker",
