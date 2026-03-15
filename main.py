@@ -113,73 +113,31 @@ def reset_metrics():
     return {"status": "reset"}
 
 
-# --- Section-based OCR filtering ---
-# Blacklisted section titles (lowercase substrings).
-# Add gradually, verify score doesn't drop after each addition.
-SECTION_BLACKLIST = [
-    "prohlášení pojistníka",
-    "prohlašuji, že",
-    "souhlas s elektronickou komunikací",
-    "zpracování osobních údajů",
-    "informace o zpracování osobních",
-    "vaše povinnost informovat",
-    "infekční onemocnění",
-    "kontaminace a znečištění",
-    "retroaktivní krytí",
-    "výluk",
-    "výluka",
-    "zachraňovací náklady",
-    "když nebudete s něčím spokojeni",
-    "sériová škoda",
-    "křížová povinnost",
-    "regresy zdravotních",
-    "pojištěná činnost velkoobchod",
-]
+@app.post("/solve")
+def solve(payload: dict):
+    """
+    Extract structured CRM fields from insurance contract documents.
 
-
-def _is_section_header(line: str) -> bool:
-    """Detect if a line is a section header."""
-    stripped = line.strip()
-    if not stripped or len(stripped) > 120:
-        return False
-    if len(stripped) >= 3 and stripped == stripped.upper() and any(c.isalpha() for c in stripped):
-        return True
-    if re.match(r'^(\d+\.|\d+\.\d+|[IVXLC]+\.|článek\s+\d|čl\.\s*\d)', stripped, re.IGNORECASE):
-        return True
-    return False
-
-
-def parse_sections(text: str) -> list[dict]:
-    """Parse OCR text into a list of sections: [{"title": ..., "lines": [...]}, ...]."""
-    sections = []
-    current = {"title": None, "lines": []}
-
-    for line in text.splitlines():
-        if _is_section_header(line):
-            if current["lines"] or current["title"]:
-                sections.append(current)
-            current = {"title": line.strip(), "lines": []}
-        else:
-            current["lines"].append(line)
-
-    if current["lines"] or current["title"]:
-        sections.append(current)
-
-    return sections
-
-
-def filter_sections(sections: list[dict]) -> list[dict]:
-    """Remove blacklisted sections by title."""
-    if not SECTION_BLACKLIST:
-        return sections
-    result = []
-    for sec in sections:
-        title = (sec["title"] or "").lower()
-        if any(bl in title for bl in SECTION_BLACKLIST):
-            continue
-        result.append(sec)
-    return result
-
+    Input example:
+    {
+        "documents": [
+            {
+                "pdf_url": "https://storage.googleapis.com/.../smlouva.pdf",
+                "filename": "smlouva_hlavni.pdf",
+                "ocr_text": "... OCR extracted text of main contract ..."
+            },
+            {
+                "pdf_url": "https://storage.googleapis.com/.../dodatek_1.pdf",
+                "filename": "dodatek_1.pdf",
+                "ocr_text": "... OCR text of amendment 1 ..."
+            },
+            {
+                "pdf_url": "https://storage.googleapis.com/.../dodatek_2.pdf",
+                "filename": "dodatek_2.pdf",
+                "ocr_text": "... OCR text of amendment 2 ..."
+            }
+        ]
+    }
 
 def sections_to_text(sections: list[dict]) -> str:
     """Reassemble sections back into plain text."""

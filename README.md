@@ -15,20 +15,25 @@ POST /solve
 {
   "documents": [
     {
+      "pdf_url": "https://storage.googleapis.com/renomia-ai-hackathon-hackathon-training-docs/challenge-2/training/poj%201/PS%203301%200150%2023_Redigov%C3%A1no.pdf",
       "filename": "smlouva_hlavni.pdf",
       "ocr_text": "POJISTNÁ SMLOUVA č. POJ-2024-12345\n\nPojistitel: Generali Česká pojišťovna a.s.\nPojistník: ACME s.r.o.\n\nDatum uzavření: 15.12.2023\nPočátek pojištění: 01.01.2024\nDoba trvání: neurčitá\n\nSplátky: čtvrtletně\nPojistné období: 12 měsíců\nMěna: CZK\n\nPo uplynutí pojistného období se smlouva automaticky prodlužuje.\nVýpovědní lhůta: 6 týdnů před koncem pojistného období."
     },
     {
+      "pdf_url": "https://storage.googleapis.com/.../dodatek_1.pdf",
       "filename": "dodatek_1.pdf",
       "ocr_text": "DODATEK č. 1 k pojistné smlouvě POJ-2024-12345\n\nS účinností od 01.04.2024 se mění:\n- Splátky: pololetně"
     },
     {
+      "pdf_url": "https://storage.googleapis.com/.../dodatek_3.pdf",
       "filename": "dodatek_3.pdf",
       "ocr_text": "DODATEK č. 3 k pojistné smlouvě POJ-2024-12345\n\nS účinností od 01.10.2024 se mění:\n- Pojistné období: 6 měsíců"
     }
   ]
 }
 ```
+
+> **Note:** Each document includes a `pdf_url` pointing to the original PDF in GCS, `filename` with the original name, and `ocr_text` with the Layout Parser OCR output. You can use `pdf_url` to download and re-process the original PDF if needed.
 
 ## Expected output
 
@@ -53,7 +58,11 @@ POST /solve
   "noticePeriod": "six-weeks",
   "regPlate": null,
   "latestEndorsementNumber": "3",
-  "note": null
+  "note": null,
+  "annualPremiumTotal": 24556,
+  "liabilityLimitHealth": 150000000,
+  "liabilityLimitProperty": 150000000,
+  "insuranceScope": "Povinné ručení a havarijní pojištění"
 }
 ```
 
@@ -69,7 +78,7 @@ POST /solve
 | `contractRegime` | enum | `individual` \| `frame` \| `fleet` \| `coinsurance` | Režim smlouvy |
 | `startAt` | string | `DD.MM.YYYY` | Počátek pojištění |
 | `endAt` | string/null | `DD.MM.YYYY` or `null` | Konec pojištění (null = doba neurčitá) |
-| `concludedAt` | string | `DD.MM.YYYY` | Datum uzavření smlouvy |
+| `concludedAt` | string/null | `DD.MM.YYYY` or `null` | Datum uzavření smlouvy (null if not explicitly stated) |
 | `installmentNumberPerInsurancePeriod` | number | `1`=yearly, `2`=semi, `4`=quarterly, `12`=monthly | Počet splátek za pojistné období |
 | `insurancePeriodMonths` | number | `12`=yearly, `6`=semi, `3`=quarterly, `1`=monthly | Délka pojistného období v měsících |
 | `premium.currency` | string | ISO 4217 lowercase (e.g. `czk`) | Měna pojistného |
@@ -78,7 +87,11 @@ POST /solve
 | `noticePeriod` | string/null | e.g. `six-weeks` | Výpovědní lhůta |
 | `regPlate` | string/null | — | SPZ (only for vehicle insurance) |
 | `latestEndorsementNumber` | string/null | — | Číslo posledního dodatku |
-| `note` | string/null | — | Zvláštní podmínky |
+| `note` | string/null | — | Zvláštní podmínky (not scored) |
+| `annualPremiumTotal` | number/null | — | Celkové roční pojistné |
+| `liabilityLimitHealth` | number/null | — | Limit plnění pro újmu na zdraví |
+| `liabilityLimitProperty` | number/null | — | Limit plnění pro věcnou škodu |
+| `insuranceScope` | string/null | — | Rozsah pojištění (e.g. "Povinné ručení a havarijní pojištění") |
 
 ## Scoring
 
