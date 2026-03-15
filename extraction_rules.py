@@ -180,10 +180,14 @@ FIELD_RULES: list[FieldRule] = [
         description="Number of premium installments per insurance period",
         extraction_rule=(
             "Determine how many premium installments per insurance period. "
-            "Values: 1=annually (rocne), 2=semi-annually (pololetne), "
-            "4=quarterly (ctvrtletne), 12=monthly (mesicne). "
-            "For single-payment (jednorazove) contracts, use 1. "
-            "Default: 1 if not specified."
+            "Values: 1=annually (ročně/jednorazově), 2=semi-annually (pololetně), "
+            "4=quarterly (čtvrtletně), 12=monthly (měsíčně). "
+            "Look for: 'splátka', 'frekvence placení', 'pojistné se platí', "
+            "'způsob placení', 'roční/pololetní/čtvrtletní/měsíční pojistné'. "
+            "If the document lists both an annual total AND a smaller periodic amount "
+            "(e.g., roční 10000 + pololetní 5000), derive the frequency from that. "
+            "For single-payment (jednorázové) contracts, use 1. "
+            "Default: 1 only if no payment frequency info found at all."
         ),
         allowed_values=(1, 2, 4, 12),
         default=1,
@@ -195,19 +199,18 @@ FIELD_RULES: list[FieldRule] = [
         type="number",
         description="Length of insurance period in months",
         extraction_rule=(
-            "Determine the insurance period length (pojistné období) in months. "
-            "Values: 12=annual, 6=semi-annual, 3=quarterly, 1=monthly. "
-            "CRITICAL: This is the BILLING/RENEWAL CYCLE length, NOT the total contract duration. "
-            "DO NOT confuse contract duration (doba trvání, e.g., '3x1 rok', '3 roky') with "
-            "the insurance period (pojistné období). "
-            "Look for explicit mentions like 'pojistné období: 1 rok', 'roční pojistné období', "
-            "'čtvrtletní pojistné období', or payment frequency labels. "
-            "For single-payment (jednorázové) short-term insurance "
-            "(e.g., travel insurance lasting weeks or a few months), use 1. "
-            "Return null if the insurance period is not explicitly mentioned "
-            "and cannot be reliably determined from payment frequency. "
-            "DO NOT default to 12 — return null if unsure. "
-            "DO NOT infer the insurance period solely from the total contract duration."
+            "Determine the insurance period (pojistné období) in months. "
+            "Allowed values: null, 1, 3, 6, 12. "
+            "This is the BILLING/RENEWAL CYCLE, NOT the total contract duration. "
+            "HOW TO DETERMINE: "
+            "1. If explicitly stated ('pojistné období: 1 rok'), use that. "
+            "2. CALCULATION METHOD: if you find total/annual premium (roční pojistné) "
+            "AND installment amount (splátka), calculate: "
+            "payments = roční/splátka, period = 12/payments. "
+            "Example: roční 24000 Kč, splátka 6000 Kč → 24000/6000=4 → 12/4=3 months. "
+            "3. From payment frequency: ročně→12, pololetně→6, čtvrtletně→3, měsíčně→1. "
+            "4. For short-term single-payment insurance (travel, jednorázové) → 1. "
+            "5. Return null only if no premium or frequency info is available at all."
         ),
         allowed_values=(1, 3, 6, 12),
         default=None,

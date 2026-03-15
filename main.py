@@ -113,15 +113,27 @@ def reset_metrics():
     return {"status": "reset"}
 
 
-# Sections to skip from OCR text before sending to Gemini.
+# --- Section-based OCR filtering ---
+# Blacklisted section titles (lowercase substrings).
 # Add gradually, verify score doesn't drop after each addition.
 SECTION_BLACKLIST = [
-    # "prohlášení",
-    # "zpracování osobních údajů",
-    # "závěrečná ustanovení",
-    # "infekční onemocnění",
-    # "kontaminace",
-    # "vaše povinnost informovat",
+    "prohlášení pojistníka",
+    "prohlašuji, že",
+    "souhlas s elektronickou komunikací",
+    "zpracování osobních údajů",
+    "informace o zpracování osobních",
+    "vaše povinnost informovat",
+    "infekční onemocnění",
+    "kontaminace a znečištění",
+    "retroaktivní krytí",
+    "výluk",
+    "výluka",
+    "zachraňovací náklady",
+    "když nebudete s něčím spokojeni",
+    "sériová škoda",
+    "křížová povinnost",
+    "regresy zdravotních",
+    "pojištěná činnost velkoobchod",
 ]
 
 
@@ -130,33 +142,53 @@ def _is_section_header(line: str) -> bool:
     stripped = line.strip()
     if not stripped or len(stripped) > 120:
         return False
-    # All caps line (at least 3 chars)
     if len(stripped) >= 3 and stripped == stripped.upper() and any(c.isalpha() for c in stripped):
         return True
-    # Numbered sections: "1.", "1.1", "Článek 1", "Čl. 1", Roman numerals
     if re.match(r'^(\d+\.|\d+\.\d+|[IVXLC]+\.|článek\s+\d|čl\.\s*\d)', stripped, re.IGNORECASE):
         return True
     return False
 
 
-def filter_sections(text: str) -> str:
-    """Remove blacklisted sections from OCR text."""
-    if not SECTION_BLACKLIST:
-        return text
+def parse_sections(text: str) -> list[dict]:
+    """Parse OCR text into a list of sections: [{"title": ..., "lines": [...]}, ...]."""
+    sections = []
+    current = {"title": None, "lines": []}
 
-    lines = text.splitlines()
-    result = []
-    skip = False
-
-    for line in lines:
+    for line in text.splitlines():
         if _is_section_header(line):
-            header_lower = line.strip().lower()
-            skip = any(bl in header_lower for bl in SECTION_BLACKLIST)
+            if current["lines"] or current["title"]:
+                sections.append(current)
+            current = {"title": line.strip(), "lines": []}
+        else:
+            current["lines"].append(line)
 
-        if not skip:
-            result.append(line)
+    if current["lines"] or current["title"]:
+        sections.append(current)
 
-    return '\n'.join(result)
+    return sections
+
+
+def filter_sections(sections: list[dict]) -> list[dict]:
+    """Remove blacklisted sections by title."""
+    if not SECTION_BLACKLIST:
+        return sections
+    result = []
+    for sec in sections:
+        title = (sec["title"] or "").lower()
+        if any(bl in title for bl in SECTION_BLACKLIST):
+            continue
+        result.append(sec)
+    return result
+
+
+def sections_to_text(sections: list[dict]) -> str:
+    """Reassemble sections back into plain text."""
+    parts = []
+    for sec in sections:
+        if sec["title"]:
+            parts.append(sec["title"])
+        parts.extend(sec["lines"])
+    return "\n".join(parts)
 
 
 def extract_note(combined_text: str) -> str | None:
@@ -210,6 +242,57 @@ def clean_ocr_text(text: str) -> str:
     text = re.sub(r'(?m)^[\s]*-\s*\d+\s*-[\s]*$', '', text)
     text = '\n'.join(line.rstrip() for line in text.splitlines())
     return text.strip()
+
+
+def _parse_czech_number(s: str) -> float | None:
+    """Parse Czech formatted number: '24 000', '24000', '24.000,50'."""
+    s = s.strip().replace('\xa0', '').replace(' ', '')
+    # "24.000,50" → "24000.50"
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    else:
+        # "24.000" with dot as thousands separator (no decimal)
+        if s.count('.') > 1 or (s.count('.') == 1 and len(s.split('.')[-1]) == 3):
+            s = s.replace('.', '')
+    try:
+        val = float(s)
+        return val if val > 0 else None
+    except ValueError:
+        return None
+
+
+def extract_insurance_period_from_premiums(text: str) -> int | None:
+    """Calculate insurance period: 12 / (annual_premium / installment_amount)."""
+    # Find annual/total premium
+    annual_m = re.search(
+        r'(?:roční|celkov[ée]|úhrn\w*)\s+pojistn[ée]\s*:?\s*([\d\s.,\xa0]+)',
+        text, re.IGNORECASE
+    )
+    if not annual_m:
+        return None
+    annual = _parse_czech_number(annual_m.group(1))
+    if not annual:
+        return None
+
+    # Find installment/periodic amount
+    installment_m = re.search(
+        r'(?:splátk[ay]|(?:pololetní|čtvrtletní|měsíční)\s+pojistn[ée])\s*:?\s*([\d\s.,\xa0]+)',
+        text, re.IGNORECASE
+    )
+    if not installment_m:
+        return None
+    installment = _parse_czech_number(installment_m.group(1))
+    if not installment:
+        return None
+
+    # Calculate
+    num_payments = round(annual / installment)
+    if num_payments <= 0:
+        return None
+    period = 12 / num_payments
+    if period in (1, 3, 6, 12):
+        return int(period)
+    return None
 
 
 def extract_endorsement_number(documents: list) -> str | None:
@@ -375,14 +458,20 @@ def extract_notice_period_from_vpp(documents: list) -> str | None:
             continue
         text = doc.get("ocr_text", "")
         for pattern, value in notice_map.items():
-            # Look for "výpovědní lhůta" specifically near the time pattern
-            context_re = r'výpovědní\s+lhůt[^\n]{0,80}' + pattern
-            if re.search(context_re, text, re.IGNORECASE):
-                return value
-            # Also match reversed order: time pattern near "výpovědní lhůta"
-            reverse_re = pattern + r'[^\n]{0,80}výpovědní\s+lhůt'
-            if re.search(reverse_re, text, re.IGNORECASE):
-                return value
+            # Match "výpovědní lhůta" or "lhůta pro výpověď" near time pattern
+            for ctx in [
+                r'výpovědní\s+lhůt[^\n]{0,80}' + pattern,
+                pattern + r'[^\n]{0,80}výpovědní\s+lhůt',
+                r'lhůt[^\n]{0,40}výpověd[^\n]{0,40}' + pattern,
+                r'výpověd[^\n]{0,60}' + pattern,
+            ]:
+                match = re.search(ctx, text, re.IGNORECASE)
+                if match:
+                    # Exclude renewal notification deadlines
+                    context = match.group()
+                    if re.search(r'před\s+uplynutím|před\s+koncem', context, re.IGNORECASE):
+                        continue
+                    return value
     return None
 
 
@@ -441,32 +530,34 @@ def clear_cache():
 def solve(payload: dict):
     documents = payload.get("documents", [])
 
-    # Collect and clean OCR text (skip VPP documents)
+    # 1. Preprocess: clean OCR, parse into sections, filter, reassemble
     combined_text = ""
     for doc in documents:
         filename = doc.get("filename", "unknown")
         if is_vpp_document(filename):
             continue
-        ocr_text = clean_ocr_text(doc.get("ocr_text", ""))
-        ocr_text = filter_sections(ocr_text)
-        combined_text += f"\n=== {filename} ===\n{ocr_text}\n"
+        cleaned = clean_ocr_text(doc.get("ocr_text", ""))
+        sections = parse_sections(cleaned)
+        sections = filter_sections(sections)
+        text = sections_to_text(sections)
+        combined_text += f"\n=== {filename} ===\n{text}\n"
 
-    # Cache lookup
+    # 2. Cache lookup
     cache_key = hashlib.sha256(combined_text.encode()).hexdigest()
     cached = get_cached_result(cache_key)
     if cached:
         return cached
 
-    # Extract fields via regex (no AI needed)
+    # 3. Regex extractions (no AI)
     endorsement_number = extract_endorsement_number(documents)
     note = extract_note(combined_text)
 
-    # Call Gemini
+    # 4. Gemini extraction
     prompt = EXTRACTION_PROMPT + combined_text
     response = gemini.generate(prompt)
     extracted = parse_gemini_response(response.text)
 
-    # Build final result
+    # 5. Build result from extracted + regex fields
     result = {
         "contractNumber": extracted.get("contractNumber"),
         "insurerName": extracted.get("insurerName"),
@@ -487,30 +578,29 @@ def solve(payload: dict):
         "note": note,
     }
 
-    # Deterministic state override: "Nabídka"/"Návrh" are standard form titles, not drafts
+    # 6. Deterministic overrides
     if result.get("state") == "draft" and result.get("startAt"):
         result["state"] = "accepted"
 
-    # VPP fallbacks: extract data from filtered-out VPP docs if AI missed it
-    if not result.get("insurerName"):
-        vpp_insurer = extract_insurer_from_vpp(documents)
-        if vpp_insurer:
-            result["insurerName"] = vpp_insurer
+    # insurancePeriodMonths fallback: calculate from premium amounts (only for auto-renewal)
+    if (result.get("insurancePeriodMonths") is None
+            and result.get("actionOnInsurancePeriodTermination") == "auto-renewal"):
+        calculated_period = extract_insurance_period_from_premiums(combined_text)
+        if calculated_period is not None:
+            result["insurancePeriodMonths"] = calculated_period
 
-    # Regex fallback: search for known insurer names in contract text
+    # 7. Fallbacks: VPP docs + known insurer names
     if not result.get("insurerName"):
-        insurer = extract_insurer_by_name(combined_text)
-        if insurer:
-            result["insurerName"] = insurer
+        result["insurerName"] = (
+            extract_insurer_from_vpp(documents)
+            or extract_insurer_by_name(combined_text)
+        )
 
     if not result.get("noticePeriod"):
-        vpp_notice = extract_notice_period_from_vpp(documents)
-        if vpp_notice:
-            result["noticePeriod"] = vpp_notice
+        result["noticePeriod"] = extract_notice_period_from_vpp(documents)
 
-    # Cache result
+    # 8. Cache and return
     set_cached_result(cache_key, result)
-
     return result
 
 
