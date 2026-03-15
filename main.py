@@ -375,9 +375,51 @@ def extract_notice_period_from_vpp(documents: list) -> str | None:
             continue
         text = doc.get("ocr_text", "")
         for pattern, value in notice_map.items():
-            context_re = r'(?:výpověd|vypověd|výpověď|lhůt)[^\n]{0,80}' + pattern
+            # Look for "výpovědní lhůta" specifically near the time pattern
+            context_re = r'výpovědní\s+lhůt[^\n]{0,80}' + pattern
             if re.search(context_re, text, re.IGNORECASE):
                 return value
+            # Also match reversed order: time pattern near "výpovědní lhůta"
+            reverse_re = pattern + r'[^\n]{0,80}výpovědní\s+lhůt'
+            if re.search(reverse_re, text, re.IGNORECASE):
+                return value
+    return None
+
+
+KNOWN_INSURERS = [
+    # Longer/more specific names first to prefer best match
+    "Kooperativa pojišťovna, a.s., Vienna Insurance Group",
+    "Kooperativa pojišťovna",
+    "Generali Česká pojišťovna a.s.",
+    "Generali Česká pojišťovna",
+    "Generali Ceska pojistovna",
+    "INTER PARTNER ASSISTANCE, S.A.",
+    "INTER PARTNER ASSISTANCE",
+    "ČSOB Pojišťovna",
+    "CSOB Pojistovna",
+    "Hasičská vzájemná pojišťovna",
+    "Pojišťovna VZP",
+    "Slavia pojišťovna",
+    "Direct pojišťovna",
+    "Pillow pojišťovna",
+    "Colonnade",
+    "Kooperativa",
+    "Allianz",
+    "UNIQA",
+    "Generali",
+    "Česká pojišťovna",
+    "AXA",
+    "HDI",
+    "Credendo",
+]
+
+
+def extract_insurer_by_name(text: str) -> str | None:
+    """Search for known insurer names in OCR text (longest match first)."""
+    text_lower = text.lower()
+    for name in KNOWN_INSURERS:
+        if name.lower() in text_lower:
+            return name
     return None
 
 
@@ -445,11 +487,21 @@ def solve(payload: dict):
         "note": note,
     }
 
+    # Deterministic state override: "Nabídka"/"Návrh" are standard form titles, not drafts
+    if result.get("state") == "draft" and result.get("startAt"):
+        result["state"] = "accepted"
+
     # VPP fallbacks: extract data from filtered-out VPP docs if AI missed it
     if not result.get("insurerName"):
         vpp_insurer = extract_insurer_from_vpp(documents)
         if vpp_insurer:
             result["insurerName"] = vpp_insurer
+
+    # Regex fallback: search for known insurer names in contract text
+    if not result.get("insurerName"):
+        insurer = extract_insurer_by_name(combined_text)
+        if insurer:
+            result["insurerName"] = insurer
 
     if not result.get("noticePeriod"):
         vpp_notice = extract_notice_period_from_vpp(documents)

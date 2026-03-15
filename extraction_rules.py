@@ -62,8 +62,11 @@ FIELD_RULES: list[FieldRule] = [
             "Determine the contract state. IMPORTANT DEFAULT RULE: "
             "Most insurance contracts that exist as documents are 'accepted' (signed/effective). "
             "Use 'accepted' as the DEFAULT unless there is EXPLICIT evidence otherwise. "
-            "Use 'draft' ONLY if the document explicitly says it is a 'navrh' (proposal) "
-            "or 'navrh pojistne smlouvy' and has NOT been accepted yet. "
+            "CRITICAL: Documents titled 'Nabídka pojistné smlouvy', 'Návrh pojistné smlouvy', "
+            "'Nabídka' or 'Návrh' are STANDARD insurance contract forms — these are NOT drafts. "
+            "These titles are just the formal name of the document template. "
+            "Use 'draft' ONLY if the document explicitly states it has not been accepted/signed "
+            "AND there is no evidence of signatures or effective dates. "
             "Use 'cancelled' ONLY if there is explicit mention of cancellation "
             "(vypoved, storno, zruseni) that terminated the contract. "
             "DO NOT use 'draft' just because you cannot see signatures — "
@@ -97,11 +100,12 @@ FIELD_RULES: list[FieldRule] = [
             "Determine if the contract was concluded through an agent or broker. "
             "STRONG DEFAULT: 'broker'. Use 'broker' in most cases, especially when "
             "Renomia (a brokerage company) is mentioned anywhere. "
-            "Use 'agent' ONLY if the document EXPLICITLY mentions the intermediary role "
-            "as 'agent' or 'pojistovaci agent', or if the insurance company itself "
-            "arranged the contract directly without any broker. "
+            "IMPORTANT: 'zprostředkovatel' (intermediary/middleman) = broker, NOT agent. "
+            "Use 'agent' ONLY if the document EXPLICITLY uses the word 'agent' or "
+            "'pojišťovací agent', or if the insurance company arranged the contract "
+            "directly without any broker/makléř involvement. "
             "If there is NO mention of broker or agent at all, return 'broker'. "
-            "DO NOT return 'agent' just because you see no broker mentioned."
+            "DO NOT return 'agent' just because you see 'zprostředkovatel' — that means broker."
         ),
         allowed_values=("agent", "broker"),
         default="broker",
@@ -147,13 +151,15 @@ FIELD_RULES: list[FieldRule] = [
             "2. If the contract says it auto-renews (automaticky se prodluzuje) "
             "and there is no FIXED end date = return null. "
             "3. DO NOT CALCULATE end date from start date + duration. "
-            "4. Only return a date if the contract EXPLICITLY states "
-            "'konec pojisteni', 'pojisteni do', 'pojistna doba konci dnem', "
-            "or has a specific end date clearly written. "
+            "For example, if the contract says 'Sjednává se na dobu 3 let' (concluded for 3 years) "
+            "or 'na dobu 1 roku' (for 1 year), do NOT compute startAt + duration. "
+            "A contract duration is NOT an explicit end date. "
+            "4. Only return a date if the contract has a LITERAL date written for the end, "
+            "such as 'konec pojisteni: 01.01.2026', 'pojisteni do 01.01.2026', "
+            "'pojistna doba konci dnem 01.01.2026'. "
             "5. For fixed-term contracts (e.g., travel insurance with explicit end date), "
             "return the stated end date. "
-            "6. If the contract has both a fixed initial period AND auto-renewal to "
-            "indefinite, return null."
+            "6. If the contract has both a fixed initial period AND auto-renewal, return null."
         ),
         nullable=True,
     ),
@@ -189,16 +195,19 @@ FIELD_RULES: list[FieldRule] = [
         type="number",
         description="Length of insurance period in months",
         extraction_rule=(
-            "Determine the insurance period length (pojistne obdobi) in months. "
+            "Determine the insurance period length (pojistné období) in months. "
             "Values: 12=annual, 6=semi-annual, 3=quarterly, 1=monthly. "
             "CRITICAL: This is the BILLING/RENEWAL CYCLE length, NOT the total contract duration. "
-            "DO NOT confuse contract duration (doba trvani, e.g., '3x1 rok', '3 roky') with "
-            "the insurance period (pojistne obdobi). "
-            "For single-payment (jednorazove) short-term insurance "
+            "DO NOT confuse contract duration (doba trvání, e.g., '3x1 rok', '3 roky') with "
+            "the insurance period (pojistné období). "
+            "Look for explicit mentions like 'pojistné období: 1 rok', 'roční pojistné období', "
+            "'čtvrtletní pojistné období', or payment frequency labels. "
+            "For single-payment (jednorázové) short-term insurance "
             "(e.g., travel insurance lasting weeks or a few months), use 1. "
             "Return null if the insurance period is not explicitly mentioned "
-            "and cannot be reliably determined. "
-            "DO NOT default to 12 — return null if unsure."
+            "and cannot be reliably determined from payment frequency. "
+            "DO NOT default to 12 — return null if unsure. "
+            "DO NOT infer the insurance period solely from the total contract duration."
         ),
         allowed_values=(1, 3, 6, 12),
         default=None,
@@ -254,15 +263,21 @@ FIELD_RULES: list[FieldRule] = [
         type="string",
         description="Notice period for contract termination",
         extraction_rule=(
-            "Extract the notice period (vypovedni lhuta) for terminating the contract. "
+            "Extract the notice period (výpovědní lhůta) for terminating the contract. "
             "Valid values: 'six-weeks', 'three-months', 'two-months', 'one-month', 'eight-days'. "
             "CRITICAL RULES: "
-            "1. Extract ONLY if the notice period is EXPLICITLY stated in the contract text. "
-            "2. Common Czech phrases: '6 tydnu'/'sest tydnu' = 'six-weeks', "
-            "'3 mesice'/'tri mesice' = 'three-months', '2 mesice' = 'two-months', "
-            "'1 mesic' = 'one-month', '8 dnu'/'osm dnu' = 'eight-days'. "
-            "3. DO NOT invent or assume a notice period that is not written in the text. "
-            "4. Return null if no notice period is explicitly mentioned."
+            "1. Extract ONLY if the notice period (výpovědní lhůta) is EXPLICITLY stated. "
+            "2. Common Czech phrases: '6 týdnů'/'šest týdnů' = 'six-weeks', "
+            "'3 měsíce'/'tři měsíce' = 'three-months', '2 měsíce' = 'two-months', "
+            "'1 měsíc' = 'one-month', '8 dnů'/'osm dnů' = 'eight-days'. "
+            "3. DO NOT confuse the auto-renewal notification deadline with the notice period. "
+            "Phrases like 'nejpozději 6 týdnů před uplynutím pojistného období' or "
+            "'oznámit X týdnů před koncem' describe the DEADLINE to notify about renewal, "
+            "NOT the výpovědní lhůta. These are different legal concepts. "
+            "4. The notice period (výpovědní lhůta) is specifically for CONTRACT TERMINATION "
+            "(výpověď smlouvy), not for renewal notifications. "
+            "5. DO NOT invent or assume a notice period that is not written in the text. "
+            "6. Return null if no notice period is explicitly mentioned."
         ),
         allowed_values=("six-weeks", "three-months", "two-months", "one-month", "eight-days"),
         default=None,
