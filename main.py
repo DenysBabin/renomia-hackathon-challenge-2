@@ -227,56 +227,18 @@ def extract_endorsement_number(documents: list) -> str | None:
     return None
 
 
-EXTRACTION_PROMPT = """Jsi expert na extrakci dat z českých pojistných smluv. Z OCR textu dokumentů extrahuj následující pole do JSON.
+from extraction_rules import (
+    FIELD_RULES,
+    RULES_BY_NAME,
+    ENUM_FIELDS,
+    ENUM_DEFAULTS,
+    VALID_NOTICE_PERIODS,
+    VALID_INSTALLMENTS,
+    VALID_PERIODS,
+    build_extraction_prompt,
+)
 
-POLE A PRAVIDLA:
-- contractNumber: string — číslo pojistné smlouvy
-- insurerName: string — název pojišťovny (pojistitel), NIKOLI pojistník
-- state: "draft" | "accepted" | "cancelled" — urči podle podpisů: pokud je smlouva podepsána oběma stranami (pojistitel i pojistník) → "accepted". Pokud smlouva NENÍ podepsána (chybí podpisy, je to návrh) → "draft". Pokud byla smlouva podepsána ale poté vypovězena/zrušena/stornována → "cancelled". Default: "accepted"
-- assetType: "other" | "vehicle" — "vehicle" pouze pokud jde o pojištění vozidla (havarijní, povinné ručení, SPZ). Jinak "other"
-- concludedAs: "agent" | "broker" — "broker" pokud je zmíněn makléř (např. Renomia). "agent" pokud je zmíněn agent. Default: "broker"
-- contractRegime: "individual" | "frame" | "fleet" | "coinsurance" — "frame" = rámcová smlouva, "fleet" = flotilová, "coinsurance" = soupojištění. Default: "individual"
-- startAt: string DD.MM.YYYY — počátek pojištění
-- endAt: string DD.MM.YYYY | null — konec pojištění. null = doba neurčitá
-- concludedAt: string DD.MM.YYYY — datum uzavření/podpisu smlouvy
-- installmentNumberPerInsurancePeriod: number — počet splátek: ročně=1, pololetně=2, čtvrtletně=4, měsíčně=12
-- insurancePeriodMonths: number | null — délka pojistného období: roční=12, pololetní=6, čtvrtletní=3, měsíční=1. null pokud není uvedeno
-- premium.currency: string — měna pojistného, ISO 4217 lowercase (czk, eur, usd)
-- premium.isCollection: boolean | null — true pokud je inkaso pojistného přes makléře/zprostředkovatele. null pokud nelze určit
-- actionOnInsurancePeriodTermination: "auto-renewal" | "policy-termination" — "auto-renewal" pokud se smlouva automaticky prodlužuje. "policy-termination" pokud po konci období končí
-- noticePeriod: string | null — výpovědní lhůta: "six-weeks", "three-months", "two-months", "one-month", "eight-days". null pokud není uvedena
-- regPlate: string | null — SPZ/RZ vozidla. null pokud nejde o vozidlo
-- note: VŽDY vrať null (poznámky se extrahují jiným způsobem)
-
-DŮLEŽITÉ:
-- Dodatky (amendments) PŘEPISUJÍ hodnoty ze základní smlouvy — použij POSLEDNÍ platnou hodnotu
-- Datumy vždy ve formátu DD.MM.YYYY s nulami (01.03.2024, ne 1.3.2024)
-- Pokud pole nelze určit z textu → null
-- Odpověz POUZE validním JSON objektem, BEZ vysvětlení, BEZ markdown
-
-TEXT DOKUMENTŮ:
-"""
-
-
-ENUM_DEFAULTS = {
-    "state": ("draft", "accepted", "cancelled"),
-    "assetType": ("other", "vehicle"),
-    "concludedAs": ("agent", "broker"),
-    "contractRegime": ("individual", "frame", "fleet", "coinsurance"),
-    "actionOnInsurancePeriodTermination": ("auto-renewal", "policy-termination"),
-}
-
-ENUM_FALLBACKS = {
-    "state": "accepted",
-    "assetType": "other",
-    "concludedAs": "broker",
-    "contractRegime": "individual",
-    "actionOnInsurancePeriodTermination": "auto-renewal",
-}
-
-VALID_NOTICE_PERIODS = {
-    "six-weeks", "three-months", "two-months", "one-month", "eight-days",
-}
+EXTRACTION_PROMPT = build_extraction_prompt()
 
 
 def validate_date(value) -> str | None:
@@ -290,7 +252,7 @@ def validate_date(value) -> str | None:
 
 
 def parse_gemini_response(response_text: str) -> dict:
-    """Parse and validate JSON response from Gemini."""
+    """Parse and validate JSON response from Gemini using FIELD_RULES."""
     text = response_text.strip()
     # Strip markdown wrapper if present
     md_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
@@ -306,43 +268,40 @@ def parse_gemini_response(response_text: str) -> dict:
     except json.JSONDecodeError:
         return {}
 
-    # Validate enum fields
-    for field, valid_values in ENUM_DEFAULTS.items():
-        val = data.get(field)
-        if val not in valid_values:
-            data[field] = ENUM_FALLBACKS[field]
+    for rule in FIELD_RULES:
+        if rule.name.startswith("premium."):
+            continue  # Handle nested premium separately
 
-    # Validate dates
-    for date_field in ("startAt", "endAt", "concludedAt"):
-        data[date_field] = validate_date(data.get(date_field))
+        val = data.get(rule.name)
 
-    # Currency to lowercase, isCollection can be bool or null
+        if rule.type == "enum" and rule.allowed_values:
+            if val not in rule.allowed_values:
+                data[rule.name] = rule.fallback_on_invalid or rule.default
+
+        elif rule.type == "date":
+            data[rule.name] = validate_date(val)
+
+        elif rule.type == "number" and rule.allowed_values:
+            if val is None and rule.nullable:
+                data[rule.name] = None
+            elif val not in rule.allowed_values:
+                data[rule.name] = rule.fallback_on_invalid if rule.fallback_on_invalid is not None else rule.default
+
+    # Handle premium nested object
     premium = data.get("premium", {})
     if isinstance(premium, dict):
         currency = premium.get("currency", "czk")
-        if isinstance(currency, str):
-            premium["currency"] = currency.lower()
-        else:
-            premium["currency"] = "czk"
+        premium["currency"] = currency.lower() if isinstance(currency, str) else "czk"
         is_coll = premium.get("isCollection")
-        if is_coll is not None and not isinstance(is_coll, bool):
-            premium["isCollection"] = False
+        premium["isCollection"] = is_coll if isinstance(is_coll, bool) else False
         data["premium"] = premium
     else:
         data["premium"] = {"currency": "czk", "isCollection": False}
 
     # Validate noticePeriod
-    np = data.get("noticePeriod")
-    if np and np not in VALID_NOTICE_PERIODS:
+    np_val = data.get("noticePeriod")
+    if np_val and np_val not in VALID_NOTICE_PERIODS:
         data["noticePeriod"] = None
-
-    # Validate installment and period numbers
-    inst = data.get("installmentNumberPerInsurancePeriod")
-    if inst not in (1, 2, 4, 12):
-        data["installmentNumberPerInsurancePeriod"] = 1
-    period = data.get("insurancePeriodMonths")
-    if period is not None and period not in (1, 3, 6, 12):
-        data["insurancePeriodMonths"] = 12
 
     return data
 
@@ -377,6 +336,63 @@ def set_cached_result(cache_key: str, value: dict):
         conn.close()
     except Exception:
         pass
+
+
+def extract_insurer_from_vpp(documents: list) -> str | None:
+    """Extract insurer name from VPP documents before filtering them out."""
+    for doc in documents:
+        filename = doc.get("filename", "")
+        if not is_vpp_document(filename):
+            continue
+        ocr_text = doc.get("ocr_text", "")
+        header = ocr_text[:3000]
+        m = re.search(
+            r'[Pp]ojistitel\s+(?:znamená|je|znamena)\s+(.+?)(?:,\s*se\s+sídlem|,\s*se\s+sidlem|$)',
+            header,
+        )
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def extract_notice_period_from_vpp(documents: list) -> str | None:
+    """Extract standard notice period from VPP general conditions."""
+    notice_map = {
+        r'šest\s+t[ýy]dn[ůu]': "six-weeks",
+        r'6\s+t[ýy]dn[ůu]': "six-weeks",
+        r'tř[ií]\s+měs[íi]c': "three-months",
+        r'3\s+měs[íi]c': "three-months",
+        r'dv[aou]\s+měs[íi]c': "two-months",
+        r'2\s+měs[íi]c': "two-months",
+        r'jed(?:en|no)\s+měs[íi]c': "one-month",
+        r'1\s+měs[íi]c': "one-month",
+        r'osm\s+dn[ůuí]': "eight-days",
+        r'8\s+dn[ůuí]': "eight-days",
+    }
+    for doc in documents:
+        filename = doc.get("filename", "")
+        if not is_vpp_document(filename):
+            continue
+        text = doc.get("ocr_text", "")
+        for pattern, value in notice_map.items():
+            context_re = r'(?:výpověd|vypověd|výpověď|lhůt)[^\n]{0,80}' + pattern
+            if re.search(context_re, text, re.IGNORECASE):
+                return value
+    return None
+
+
+@app.post("/cache/clear")
+def clear_cache():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM cache")
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "cleared"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/solve")
@@ -420,7 +436,7 @@ def solve(payload: dict):
         "endAt": extracted.get("endAt"),
         "concludedAt": extracted.get("concludedAt"),
         "installmentNumberPerInsurancePeriod": extracted.get("installmentNumberPerInsurancePeriod", 1),
-        "insurancePeriodMonths": extracted.get("insurancePeriodMonths", 12),
+        "insurancePeriodMonths": extracted.get("insurancePeriodMonths"),
         "premium": extracted.get("premium", {"currency": "czk", "isCollection": False}),
         "actionOnInsurancePeriodTermination": extracted.get("actionOnInsurancePeriodTermination", "auto-renewal"),
         "noticePeriod": extracted.get("noticePeriod"),
@@ -428,6 +444,17 @@ def solve(payload: dict):
         "latestEndorsementNumber": endorsement_number,
         "note": note,
     }
+
+    # VPP fallbacks: extract data from filtered-out VPP docs if AI missed it
+    if not result.get("insurerName"):
+        vpp_insurer = extract_insurer_from_vpp(documents)
+        if vpp_insurer:
+            result["insurerName"] = vpp_insurer
+
+    if not result.get("noticePeriod"):
+        vpp_notice = extract_notice_period_from_vpp(documents)
+        if vpp_notice:
+            result["noticePeriod"] = vpp_notice
 
     # Cache result
     set_cached_result(cache_key, result)
