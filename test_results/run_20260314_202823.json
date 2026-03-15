@@ -1,0 +1,734 @@
+{
+  "timestamp": "2026-03-14T20:28:23.948837",
+  "server": "http://localhost:8080",
+  "summary": {
+    "examples_total": 5,
+    "examples_passed": 5,
+    "average_score": 0.85122,
+    "total_time_seconds": 74.16,
+    "total_input_chars": 1007011,
+    "token_usage": {
+      "gemini_request_count": 5,
+      "prompt_tokens": 45812,
+      "completion_tokens": 1112,
+      "total_tokens": 62873
+    }
+  },
+  "results": [
+    {
+      "example": "example_94.json",
+      "total_score": 0.8889,
+      "time_seconds": 21.74,
+      "total_input_chars": 72991,
+      "num_documents": 5,
+      "field_scores": [
+        {
+          "field": "contractNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurerName",
+          "score": 0.0,
+          "reason": "expected 'Colonnade', got null"
+        },
+        {
+          "field": "state",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "assetType",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAs",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "contractRegime",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "startAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "endAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAt",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "installmentNumberPerInsurancePeriod",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurancePeriodMonths",
+          "score": 0.0,
+          "reason": "expected null, got 12"
+        },
+        {
+          "field": "actionOnInsurancePeriodTermination",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "noticePeriod",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "regPlate",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "latestEndorsementNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "note",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "premium.currency",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.isCollection",
+          "score": 1.0,
+          "reason": "exact match"
+        }
+      ],
+      "actual_output": {
+        "contractNumber": "3301 0150 23",
+        "insurerName": null,
+        "state": "accepted",
+        "assetType": "other",
+        "concludedAs": "broker",
+        "contractRegime": "individual",
+        "startAt": "14.08.2023",
+        "endAt": "13.08.2026",
+        "concludedAt": null,
+        "installmentNumberPerInsurancePeriod": 2,
+        "insurancePeriodMonths": 12,
+        "premium": {
+          "currency": "czk",
+          "isCollection": true
+        },
+        "actionOnInsurancePeriodTermination": "policy-termination",
+        "noticePeriod": null,
+        "regPlate": null,
+        "latestEndorsementNumber": "3",
+        "note": null
+      },
+      "expected_output": {
+        "note": null,
+        "endAt": "13.08.2026",
+        "state": "accepted",
+        "premium": {
+          "currency": "czk",
+          "isCollection": true
+        },
+        "startAt": "14.08.2023",
+        "regPlate": null,
+        "assetType": "other",
+        "concludedAs": "broker",
+        "concludedAt": null,
+        "insurerName": "Colonnade",
+        "noticePeriod": null,
+        "contractNumber": "3301 0150 23",
+        "contractRegime": "individual",
+        "insurancePeriodMonths": null,
+        "latestEndorsementNumber": "3",
+        "actionOnInsurancePeriodTermination": "policy-termination",
+        "installmentNumberPerInsurancePeriod": 2
+      }
+    },
+    {
+      "example": "example_95.json",
+      "total_score": 0.8333,
+      "time_seconds": 18.43,
+      "total_input_chars": 28861,
+      "num_documents": 2,
+      "field_scores": [
+        {
+          "field": "contractNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurerName",
+          "score": 0.0,
+          "reason": "expected 'Allianz', got null"
+        },
+        {
+          "field": "state",
+          "score": 0.0,
+          "reason": "expected 'accepted', got 'draft'"
+        },
+        {
+          "field": "assetType",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAs",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "contractRegime",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "startAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "endAt",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "concludedAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "installmentNumberPerInsurancePeriod",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurancePeriodMonths",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "actionOnInsurancePeriodTermination",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "noticePeriod",
+          "score": 0.0,
+          "reason": "expected null, got 'six-weeks'"
+        },
+        {
+          "field": "regPlate",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "latestEndorsementNumber",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "note",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.currency",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.isCollection",
+          "score": 1.0,
+          "reason": "exact match"
+        }
+      ],
+      "actual_output": {
+        "contractNumber": "C555010631",
+        "insurerName": null,
+        "state": "draft",
+        "assetType": "other",
+        "concludedAs": "broker",
+        "contractRegime": "individual",
+        "startAt": "18.01.2022",
+        "endAt": null,
+        "concludedAt": "17.01.2022",
+        "installmentNumberPerInsurancePeriod": 1,
+        "insurancePeriodMonths": 12,
+        "premium": {
+          "currency": "czk",
+          "isCollection": true
+        },
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "noticePeriod": "six-weeks",
+        "regPlate": null,
+        "latestEndorsementNumber": null,
+        "note": "Pojistně technická data k jednotlivým předmětůma místům pojištění jsou uvedena na samostatných přílohách. Zde je uveden součet hodnoty pojištěného majetku a pojistného pro všechna sjednaná místa pojištění."
+      },
+      "expected_output": {
+        "note": "Pojistně technická data k jednotlivým předmětůma místům pojištění jsou uvedena na samostatných přílohách. Zde je uveden součet hodnoty pojištěného majetku a pojistného pro všechna sjednaná místa pojištění.",
+        "endAt": null,
+        "state": "accepted",
+        "premium": {
+          "currency": "czk",
+          "isCollection": true
+        },
+        "startAt": "18.01.2022",
+        "regPlate": null,
+        "assetType": "other",
+        "concludedAs": "broker",
+        "concludedAt": "17.01.2022",
+        "insurerName": "Allianz",
+        "noticePeriod": null,
+        "contractNumber": "C555010631",
+        "contractRegime": "individual",
+        "insurancePeriodMonths": 12,
+        "latestEndorsementNumber": null,
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "installmentNumberPerInsurancePeriod": 1
+      }
+    },
+    {
+      "example": "example_96.json",
+      "total_score": 0.8889,
+      "time_seconds": 11.38,
+      "total_input_chars": 287923,
+      "num_documents": 2,
+      "field_scores": [
+        {
+          "field": "contractNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurerName",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "state",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "assetType",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAs",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "contractRegime",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "startAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "endAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "installmentNumberPerInsurancePeriod",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurancePeriodMonths",
+          "score": 0.0,
+          "reason": "expected 1, got null"
+        },
+        {
+          "field": "actionOnInsurancePeriodTermination",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "noticePeriod",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "regPlate",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "latestEndorsementNumber",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "note",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "premium.currency",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.isCollection",
+          "score": 0.0,
+          "reason": "expected False, got null"
+        }
+      ],
+      "actual_output": {
+        "contractNumber": "1220040228",
+        "insurerName": "INTER PARTNER ASSISTANCE, S.A.",
+        "state": "accepted",
+        "assetType": "other",
+        "concludedAs": "agent",
+        "contractRegime": "individual",
+        "startAt": "01.02.2026",
+        "endAt": "15.03.2026",
+        "concludedAt": "21.01.2026",
+        "installmentNumberPerInsurancePeriod": 1,
+        "insurancePeriodMonths": null,
+        "premium": {
+          "currency": "czk",
+          "isCollection": null
+        },
+        "actionOnInsurancePeriodTermination": "policy-termination",
+        "noticePeriod": null,
+        "regPlate": null,
+        "latestEndorsementNumber": null,
+        "note": null
+      },
+      "expected_output": {
+        "note": null,
+        "endAt": "15.03.2026",
+        "state": "accepted",
+        "premium": {
+          "currency": "czk",
+          "isCollection": false
+        },
+        "startAt": "01.02.2026",
+        "regPlate": null,
+        "assetType": "other",
+        "concludedAs": "agent",
+        "concludedAt": "21.01.2026",
+        "insurerName": "INTER PARTNER ASSISTANCE, S.A.",
+        "noticePeriod": null,
+        "contractNumber": "1220040228",
+        "contractRegime": "individual",
+        "insurancePeriodMonths": 1,
+        "latestEndorsementNumber": null,
+        "actionOnInsurancePeriodTermination": "policy-termination",
+        "installmentNumberPerInsurancePeriod": 1
+      }
+    },
+    {
+      "example": "example_97.json",
+      "total_score": 0.8283,
+      "time_seconds": 14.97,
+      "total_input_chars": 207982,
+      "num_documents": 2,
+      "field_scores": [
+        {
+          "field": "contractNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurerName",
+          "score": 0.9090909090909091,
+          "reason": "fuzzy 0.91 ('Generali Česká pojišťovna a.s.' vs 'Generali Česká pojišťovna')"
+        },
+        {
+          "field": "state",
+          "score": 0.0,
+          "reason": "expected 'accepted', got 'draft'"
+        },
+        {
+          "field": "assetType",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAs",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "contractRegime",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "startAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "endAt",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "concludedAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "installmentNumberPerInsurancePeriod",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurancePeriodMonths",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "actionOnInsurancePeriodTermination",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "noticePeriod",
+          "score": 0.0,
+          "reason": "expected 'six-weeks', got null"
+        },
+        {
+          "field": "regPlate",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "latestEndorsementNumber",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "note",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "premium.currency",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.isCollection",
+          "score": 0.0,
+          "reason": "expected False, got null"
+        }
+      ],
+      "actual_output": {
+        "contractNumber": "6280202446",
+        "insurerName": "Generali Česká pojišťovna",
+        "state": "draft",
+        "assetType": "vehicle",
+        "concludedAs": "broker",
+        "contractRegime": "individual",
+        "startAt": "01.02.2026",
+        "endAt": null,
+        "concludedAt": "28.01.2026",
+        "installmentNumberPerInsurancePeriod": 1,
+        "insurancePeriodMonths": 12,
+        "premium": {
+          "currency": "czk",
+          "isCollection": null
+        },
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "noticePeriod": null,
+        "regPlate": "5J06953",
+        "latestEndorsementNumber": null,
+        "note": null
+      },
+      "expected_output": {
+        "note": null,
+        "endAt": null,
+        "state": "accepted",
+        "premium": {
+          "currency": "czk",
+          "isCollection": false
+        },
+        "startAt": "01.02.2026",
+        "regPlate": "5J06953",
+        "assetType": "vehicle",
+        "concludedAs": "broker",
+        "concludedAt": "28.01.2026",
+        "insurerName": "Generali Česká pojišťovna a.s.",
+        "noticePeriod": "six-weeks",
+        "contractNumber": "6280202446",
+        "contractRegime": "individual",
+        "insurancePeriodMonths": 12,
+        "latestEndorsementNumber": null,
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "installmentNumberPerInsurancePeriod": 1
+      }
+    },
+    {
+      "example": "example_98.json",
+      "total_score": 0.8167,
+      "time_seconds": 7.64,
+      "total_input_chars": 409254,
+      "num_documents": 2,
+      "field_scores": [
+        {
+          "field": "contractNumber",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurerName",
+          "score": 0.7,
+          "reason": "fuzzy 0.70 ('Kooperativa pojišťovna, a.s., Vienna Insurance Group' vs 'Kooperativa pojišťovna, a.s.')"
+        },
+        {
+          "field": "state",
+          "score": 0.0,
+          "reason": "expected 'accepted', got 'draft'"
+        },
+        {
+          "field": "assetType",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "concludedAs",
+          "score": 0.0,
+          "reason": "expected 'broker', got 'agent'"
+        },
+        {
+          "field": "contractRegime",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "startAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "endAt",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "concludedAt",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "installmentNumberPerInsurancePeriod",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "insurancePeriodMonths",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "actionOnInsurancePeriodTermination",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "noticePeriod",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "regPlate",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "latestEndorsementNumber",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "note",
+          "score": 1.0,
+          "reason": "both null"
+        },
+        {
+          "field": "premium.currency",
+          "score": 1.0,
+          "reason": "exact match"
+        },
+        {
+          "field": "premium.isCollection",
+          "score": 0.0,
+          "reason": "expected False, got null"
+        }
+      ],
+      "actual_output": {
+        "contractNumber": "6469255999",
+        "insurerName": "Kooperativa pojišťovna, a.s.",
+        "state": "draft",
+        "assetType": "vehicle",
+        "concludedAs": "agent",
+        "contractRegime": "individual",
+        "startAt": "01.02.2026",
+        "endAt": null,
+        "concludedAt": "28.01.2026",
+        "installmentNumberPerInsurancePeriod": 4,
+        "insurancePeriodMonths": 3,
+        "premium": {
+          "currency": "czk",
+          "isCollection": null
+        },
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "noticePeriod": null,
+        "regPlate": "1TC2",
+        "latestEndorsementNumber": null,
+        "note": null
+      },
+      "expected_output": {
+        "note": null,
+        "endAt": null,
+        "state": "accepted",
+        "premium": {
+          "currency": "czk",
+          "isCollection": false
+        },
+        "startAt": "01.02.2026",
+        "regPlate": "1TC2",
+        "assetType": "vehicle",
+        "concludedAs": "broker",
+        "concludedAt": "28.01.2026",
+        "insurerName": "Kooperativa pojišťovna, a.s., Vienna Insurance Group",
+        "noticePeriod": null,
+        "contractNumber": "6469255999",
+        "contractRegime": "individual",
+        "insurancePeriodMonths": 3,
+        "latestEndorsementNumber": null,
+        "actionOnInsurancePeriodTermination": "auto-renewal",
+        "installmentNumberPerInsurancePeriod": 4
+      }
+    }
+  ]
+}

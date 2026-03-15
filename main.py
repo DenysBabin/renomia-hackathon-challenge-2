@@ -113,6 +113,89 @@ def reset_metrics():
     return {"status": "reset"}
 
 
+# Sections to skip from OCR text before sending to Gemini.
+# Add gradually, verify score doesn't drop after each addition.
+SECTION_BLACKLIST = [
+    # "prohlášení",
+    # "zpracování osobních údajů",
+    # "závěrečná ustanovení",
+    # "infekční onemocnění",
+    # "kontaminace",
+    # "vaše povinnost informovat",
+]
+
+
+def _is_section_header(line: str) -> bool:
+    """Detect if a line is a section header."""
+    stripped = line.strip()
+    if not stripped or len(stripped) > 120:
+        return False
+    # All caps line (at least 3 chars)
+    if len(stripped) >= 3 and stripped == stripped.upper() and any(c.isalpha() for c in stripped):
+        return True
+    # Numbered sections: "1.", "1.1", "Článek 1", "Čl. 1", Roman numerals
+    if re.match(r'^(\d+\.|\d+\.\d+|[IVXLC]+\.|článek\s+\d|čl\.\s*\d)', stripped, re.IGNORECASE):
+        return True
+    return False
+
+
+def filter_sections(text: str) -> str:
+    """Remove blacklisted sections from OCR text."""
+    if not SECTION_BLACKLIST:
+        return text
+
+    lines = text.splitlines()
+    result = []
+    skip = False
+
+    for line in lines:
+        if _is_section_header(line):
+            header_lower = line.strip().lower()
+            skip = any(bl in header_lower for bl in SECTION_BLACKLIST)
+
+        if not skip:
+            result.append(line)
+
+    return '\n'.join(result)
+
+
+def extract_note(combined_text: str) -> str | None:
+    """Extract note from 'Poznámka:' section without AI."""
+    match = re.search(r'pozn[aá]mk[ay]\s*:', combined_text, re.IGNORECASE)
+    if not match:
+        return None
+
+    after = combined_text[match.end():]
+    lines = after.split('\n')
+
+    note_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if note_lines:
+                continue
+            continue
+
+        is_header = False
+        if len(stripped) < 60 and stripped.endswith(':'):
+            is_header = True
+        if len(stripped) >= 3 and stripped == stripped.upper() and any(c.isalpha() for c in stripped):
+            is_header = True
+        if re.match(r'^\d+\.', stripped):
+            is_header = True
+        if len(stripped.split()) == 1 and len(stripped) < 30 and not stripped.endswith('.'):
+            is_header = True
+
+        if is_header:
+            break
+
+        note_lines.append(stripped)
+
+    if note_lines:
+        return ' '.join(note_lines)
+    return None
+
+
 def is_vpp_document(filename: str) -> bool:
     """Check if document is VPP/general conditions (no contract-specific data)."""
     name = filename.lower()
@@ -149,7 +232,7 @@ EXTRACTION_PROMPT = """Jsi expert na extrakci dat z českých pojistných smluv.
 POLE A PRAVIDLA:
 - contractNumber: string — číslo pojistné smlouvy
 - insurerName: string — název pojišťovny (pojistitel), NIKOLI pojistník
-- state: "draft" | "accepted" | "cancelled" — stav smlouvy. Pokud je smlouva podepsána/platná → "accepted". Pokud je návrh → "draft". Pokud je vypovězena/zrušena → "cancelled". Default: "accepted"
+- state: "draft" | "accepted" | "cancelled" — urči podle podpisů: pokud je smlouva podepsána oběma stranami (pojistitel i pojistník) → "accepted". Pokud smlouva NENÍ podepsána (chybí podpisy, je to návrh) → "draft". Pokud byla smlouva podepsána ale poté vypovězena/zrušena/stornována → "cancelled". Default: "accepted"
 - assetType: "other" | "vehicle" — "vehicle" pouze pokud jde o pojištění vozidla (havarijní, povinné ručení, SPZ). Jinak "other"
 - concludedAs: "agent" | "broker" — "broker" pokud je zmíněn makléř (např. Renomia). "agent" pokud je zmíněn agent. Default: "broker"
 - contractRegime: "individual" | "frame" | "fleet" | "coinsurance" — "frame" = rámcová smlouva, "fleet" = flotilová, "coinsurance" = soupojištění. Default: "individual"
@@ -163,7 +246,7 @@ POLE A PRAVIDLA:
 - actionOnInsurancePeriodTermination: "auto-renewal" | "policy-termination" — "auto-renewal" pokud se smlouva automaticky prodlužuje. "policy-termination" pokud po konci období končí
 - noticePeriod: string | null — výpovědní lhůta: "six-weeks", "three-months", "two-months", "one-month", "eight-days". null pokud není uvedena
 - regPlate: string | null — SPZ/RZ vozidla. null pokud nejde o vozidlo
-- note: string | null — zvláštní/nestandardní podmínky. null pokud žádné nejsou
+- note: VŽDY vrať null (poznámky se extrahují jiným způsobem)
 
 DŮLEŽITÉ:
 - Dodatky (amendments) PŘEPISUJÍ hodnoty ze základní smlouvy — použij POSLEDNÍ platnou hodnotu
@@ -307,6 +390,7 @@ def solve(payload: dict):
         if is_vpp_document(filename):
             continue
         ocr_text = clean_ocr_text(doc.get("ocr_text", ""))
+        ocr_text = filter_sections(ocr_text)
         combined_text += f"\n=== {filename} ===\n{ocr_text}\n"
 
     # Cache lookup
@@ -315,8 +399,9 @@ def solve(payload: dict):
     if cached:
         return cached
 
-    # Extract endorsement number via regex
+    # Extract fields via regex (no AI needed)
     endorsement_number = extract_endorsement_number(documents)
+    note = extract_note(combined_text)
 
     # Call Gemini
     prompt = EXTRACTION_PROMPT + combined_text
@@ -341,7 +426,7 @@ def solve(payload: dict):
         "noticePeriod": extracted.get("noticePeriod"),
         "regPlate": extracted.get("regPlate"),
         "latestEndorsementNumber": endorsement_number,
-        "note": extracted.get("note"),
+        "note": note,
     }
 
     # Cache result
